@@ -1,8 +1,8 @@
-# Snakefile for the pahge genome annotation and annotation 
+# Snakefile for the phage genome annotation and annotation 
 # of defence systems using Defense Finder and Padloc
 
 # manually download genomes and create genome list
-with open("/home/adela/DefSystems/Phage_genomes/"
+with open("../Phage_genomes/"
     "Refseq/single_refseq_genomes/40_GBid/10genome_names.txt") as f:
  GENOMES = f.read().splitlines()
 
@@ -14,33 +14,33 @@ def get_phage_genome_fasta(wildcards): # takes wildcards object
 
 rule all:
  input:
-  expand("/home/adela/DefSystems/DefFinder_results/{genome}/defense_finder_systems.tsv",
+  expand("../DefFinder_results/{genome}/defense_finder_systems.tsv",
    genome=GENOMES)
 
 rule pharokka_annotation:
     input:
-        dbdir="/home/adela/build/pharokka_databases/",
+        dbdir="../build/pharokka_databases/",
         fasta=get_phage_genome_fasta 
     threads:
         4
     params:
-        outdir="/home/adela/DefSystems/Pharokka_results/{sample}/"
+        outdir="../Pharokka_results/{sample}/"
     log:
-        "/home/adela/DefSystems/Pharokka_results/{sample}/{sample}.phanotate.log"
+        "../Pharokka_results/{sample}/{sample}.phanotate.log"
     output:
-        "/home/adela/DefSystems/Pharokka_results/{sample}/phanotate.faa"
+        "../Pharokka_results/{sample}/phanotate.faa"
     shell:
         "pharokka.py -i {input.fasta} -o {params.outdir}"
         " -d {input.dbdir} -t {threads} -f > {log}"
 
 rule defence_finder:
     input:
-        "/home/adela/DefSystems/Pharokka_results/{sample}/phanotate.faa"
+        "../Pharokka_results/{sample}/phanotate.faa"
     log:
-        log="/home/adela/DefSystems/DefFinder_results/{sample}/defense_finder_systems.log"
+        log="../DefFinder_results/{sample}/defense_finder_systems.log"
     params:
-        outdir="/home/adela/DefSystems/DefFinder_results/{sample}/"
+        outdir="../DefFinder_results/{sample}/"
     output:
-        "/home/adela/DefSystems/DefFinder_results/{sample}/defense_finder_systems.tsv"
+        "../DefFinder_results/{sample}/defense_finder_systems.tsv"
     shell:
         "defense-finder run -o {params.outdir} {input} > {log}"
