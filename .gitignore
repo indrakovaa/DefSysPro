@@ -1,2 +1,2 @@
-Phage_genomes
-.snakemake
+Phage_genomes/
+.snakemake/
