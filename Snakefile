@@ -2,45 +2,57 @@
 # of defence systems using Defense Finder and Padloc
 
 # manually download genomes and create genome list
-with open("../Phage_genomes/"
-    "Refseq/single_refseq_genomes/40_GBid/10genome_names.txt") as f:
- GENOMES = f.read().splitlines()
+GENOMES = []
+for root, dirs, files in os.walk("Phage_genomes/Refseq/single_refseq_genomes/GBid"):
+    for file in files:
+        if file.endswith('.fasta'):
+            GENOMES.append(os.path.splitext(file)[0])
 
-# input configfile with all phage genomes
-configfile: "config10.yaml"
-# define function to define inputs in later stage of execution of Snakefile
-def get_phage_genome_fasta(wildcards): # takes wildcards object
-    return config["genomes"][wildcards.sample] #access it via attributes
-
+# Limit to just some amount of samples
+#GENOMES = GENOMES[0:128]            
 rule all:
  input:
-  expand("../DefFinder_results/{genome}/defense_finder_systems.tsv",
+  expand("DefFinder_results/{genome}/defense_finder_systems.tsv",
    genome=GENOMES)
 
 rule pharokka_annotation:
     input:
-        dbdir="../build/pharokka_databases/",
-        fasta=get_phage_genome_fasta 
+        "Phage_genomes/Refseq/single_refseq_genomes/GBid/{sample}/{sample}.fasta"
+        #remove GBid folder from path    
     threads:
-        4
+        32
+        resources:
+        slurm_partition = "short",
+        runtime = 60,
+        cpus_per_task = 32,
+        tasks = 1,
+        mem_mb = 8192,
+        slurm_extra = "-J pharokka"
     params:
-        outdir="../Pharokka_results/{sample}/"
-    log:
-        "../Pharokka_results/{sample}/{sample}.phanotate.log"
+        outdir="Pharokka_results/{sample}/"
     output:
-        "../Pharokka_results/{sample}/phanotate.faa"
+        "Pharokka_results/{sample}/phanotate.faa"
     shell:
-        "pharokka.py -i {input.fasta} -o {params.outdir}"
-        " -d {input.dbdir} -t {threads} -f > {log}"
+        "module load tools/python/3.8; pharokka.py -i {input.fasta}"
+        " -o {params.outdir} -t {threads} -f"
 
 rule defence_finder:
     input:
-        "../Pharokka_results/{sample}/phanotate.faa"
-    log:
-        log="../DefFinder_results/{sample}/defense_finder_systems.log"
+        "Pharokka_results/{sample}/phanotate.faa"
+    resources:
+        slurm_partition = "short",
+        runtime = 10,
+        nodes = 8,
+        cpus_per_task = 32,
+        tasks = 1,
+        mem_mb = 2048,
+        slurm_extra = "-J definder"og:
     params:
-        outdir="../DefFinder_results/{sample}/"
+        outdir="DefFinder_results/{sample}/"
     output:
-        "../DefFinder_results/{sample}/defense_finder_systems.tsv"
+        "DefFinder_results/{sample}/defense_finder_systems.tsv"
+    log:
+        log="DefFinder_results/{sample}/defense_finder_systems.log"
     shell:
-        "defense-finder run -o {params.outdir} {input} > {log}"
+        "module load tools/python/3.8; defense-finder run -o {params.outdir}"
+        " {input} > {log}"
