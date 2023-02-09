@@ -1,27 +1,29 @@
 # Snakefile for the phage genome annotation and annotation 
-# of defence systems using Defense Finder and Padloc
+# of defence systems using Defense Finder
 
-# manually download genomes and create genome list
-GENOMES = []
-for root, dirs, files in os.walk("Phage_genomes/Refseq/single_refseq_genomes/GBid"):
-    for file in files:
-        if file.endswith('.fasta'):
-            GENOMES.append(os.path.splitext(file)[0])
+# run Defense finder on gembase (more genomes - CDSs in one file)
+defense-finder run -dbtype gembase esco_genomes.faa
 
-# Limit to just some amount of samples
-#GENOMES = GENOMES[0:128]            
 rule all:
- input:
-  expand("DefFinder_results/{genome}/defense_finder_systems.tsv",
-   genome=GENOMES)
+    input:
+        expand("DefFinder_results/{genome}/defense_finder_systems.tsv",
+        genome=GENOMES)
+
+rule extract_genomes:
+    input:
+        tsv="Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv"
+        mfa="Phage_genomes/IMG_VR/IMGVR_all_nucleotides-high_confidence.fna"
+    output:
+    shell:
+        "module load tools/python/3.8; scripts/extract_entry_imgvr.py"
+        " {input.tsv} {input.mfa}"
 
 rule pharokka_annotation:
     input:
-        "Phage_genomes/Refseq/single_refseq_genomes/GBid/{sample}/{sample}.fasta"
-        #remove GBid folder from path    
+        "Phage_genomes/Refseq/GBid/{sample}/{sample}.fasta"   
     threads:
         32
-        resources:
+    resources:
         slurm_partition = "short",
         runtime = 60,
         cpus_per_task = 32,

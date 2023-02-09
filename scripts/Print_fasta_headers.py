@@ -18,7 +18,7 @@ with open('DF_phi_list.txt', 'r') as filehandle:
 print(fasta_dirs)
 
 # print headers for each fasta_dir ## funguje
-root_path = "/home/ca47yas/DefSystems/Phage_genomes/Refseq/single_refseq_genomes/GBid/"
+root_path = "/home/ca47yas/DefSystems/Phage_genomes/Refseq/GBid/"
 headers = []
 for item in fasta_dirs:
     path = os.path.join(root_path, item, item + ".fasta")
