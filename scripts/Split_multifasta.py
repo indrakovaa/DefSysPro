@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from Bio import SeqIO
 from pathlib import Path
-#help(SeqIO)
 
 multifasta = "/home/ca47yas/DefSystems/Phage_genomes/Refseq/5Jan2023_refseq_genomes.fa"
 outdir = "/home/ca47yas//DefSystems/Phage_genomes/Refseq/single_refseq_genomes/GBid/"

@@ -1,0 +1,48 @@
+---
+title: "IMG_VR"
+author: "Adéla Finstrlová"
+date: "2023-02-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#rm(list=ls(all=TRUE)) ##removes all variables that were stored in rstudio from older projects
+#install.packages("car")
+library("tidyverse")
+# install bioconductor, run with ctrl + enter, when asked "update all/some/none" pres n
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+#BiocManager::install("apeglm", ask = FALSE) # update old packages without being prompted
+# install DESeq2
+#BiocManager::install("DESeq2")
+```
+
+```{r variables, include=F}
+#Work LMDM-5
+#COMP<-"d:/Prace/"
+#T420 Lenovo
+#COMP<-"d:/Ade/Documents/Uni/Prace/"
+#Fujitsu
+COMP<-"C:/Users/VEO_lab_0/Documents/Jena/"
+```
+
+## 0. Data
+
+```{r read data}
+#read data
+IMG_data = read.table(paste0(COMP,"DefSystems/DefSysPro/Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv"), header = T, sep = "\t")
+#check data
+head(IMG_data)
+# quick length check
+hist(IMG_data$Length)
+```
+
+```{r density plot}
+# Basic density
+IMG_data %>%  ggplot(aes(x=Length, color=Topology)) + 
+  geom_density() +
+  theme_classic()
+```
+
+```

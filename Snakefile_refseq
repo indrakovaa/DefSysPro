@@ -1,0 +1,58 @@
+# Snakefile for the phage genome annotation and annotation 
+# of defence systems using Defense Finder
+
+# manually download genomes and create genome list
+GENOMES = []
+for root, dirs, files in os.walk("Phage_genomes/Refseq/single_refseq_genomes/GBid"):
+    for file in files:
+        if file.endswith('.fasta'):
+            GENOMES.append(os.path.splitext(file)[0])
+
+# Limit to just some amount of samples
+#GENOMES = GENOMES[0:128]            
+rule all:
+ input:
+  expand("DefFinder_results/{genome}/defense_finder_systems.tsv",
+   genome=GENOMES)
+
+rule pharokka_annotation:
+    input:
+        "Phage_genomes/Refseq/single_refseq_genomes/GBid/{sample}/{sample}.fasta"
+        #remove GBid folder from path    
+    threads:
+        32
+    resources:
+        slurm_partition = "short",
+        runtime = 60,
+        cpus_per_task = 32,
+        tasks = 1,
+        mem_mb = 8192,
+        slurm_extra = "-J pharokka"
+    params:
+        outdir="Pharokka_results/{sample}/"
+    output:
+        "Pharokka_results/{sample}/phanotate.faa"
+    shell:
+        "module load tools/python/3.8; pharokka.py -i {input.fasta}"
+        " -o {params.outdir} -t {threads} -f"
+
+rule defence_finder:
+    input:
+        "Pharokka_results/{sample}/phanotate.faa"
+    resources:
+        slurm_partition = "short",
+        runtime = 10,
+        nodes = 8,
+        cpus_per_task = 32,
+        tasks = 1,
+        mem_mb = 2048,
+        slurm_extra = "-J definder"og:
+    params:
+        outdir="DefFinder_results/{sample}/"
+    output:
+        "DefFinder_results/{sample}/defense_finder_systems.tsv"
+    log:
+        log="DefFinder_results/{sample}/defense_finder_systems.log"
+    shell:
+        "module load tools/python/3.8; defense-finder run -o {params.outdir}"
+        " {input} > {log}"
