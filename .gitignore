@@ -1,3 +1,5 @@
 Phage_genomes/
 .snakemake/
+.snakemake.luf/
+output/
 scripts/Phages_with_DF.csv

@@ -1,60 +1,83 @@
 # Snakefile for the phage genome annotation and annotation 
 # of defence systems using Defense Finder
+import os.path
+import sys
 
-# run Defense finder on gembase (more genomes - CDSs in one file)
-defense-finder run -dbtype gembase esco_genomes.faa
+# Define output directories
+OUTDIR = "output"
+OUTDIR_SAMPLE = os.path.join(OUTDIR, "{dataset}/{sample}")
+
+# Automatically detect what should all do
+# either generate list of genomes to process
+# or process the genomes
+DATASETS, SAMPLES, _ = glob_wildcards(OUTDIR_SAMPLE + "/{unused}.fasta")
+if not os.path.isfile(os.path.join(OUTDIR, "extracted_ok")):
+    ALL_OUTPUT = os.path.join(OUTDIR, "snakemake_genomes")
+else:
+    ALL_OUTPUT = expand(os.path.join(OUTDIR_SAMPLE, "defense_finder_systems.tsv"), zip, dataset=DATASETS, sample=SAMPLES)
+
+# Prepend loading correct python in every slurm host
+if ("--slurm" in sys.argv):
+    shell.prefix("module load tools/python/3.8; ")
+else:
+    shell.prefix("echo 'Add on slurm: module load tools/python/3.8;'; ")
 
 rule all:
     input:
-        expand("DefFinder_results/{genome}/defense_finder_systems.tsv",
-        genome=GENOMES)
+        ALL_OUTPUT
 
 rule extract_genomes:
     input:
-        tsv="Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv"
+        tsv="Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv",
         mfa="Phage_genomes/IMG_VR/IMGVR_all_nucleotides-high_confidence.fna"
     output:
+        os.path.join(OUTDIR, "extracted_ok")
+    params:
+        filter="GVMAG",
+        outdir=OUTDIR
     shell:
-        "module load tools/python/3.8; scripts/extract_entry_imgvr.py"
-        " {input.tsv} {input.mfa}"
+        "scripts/extract_topology.py {params.filter} {input.tsv} {input.mfa} {params.outdir}"
+
+rule snakemake_genomes:
+    input:
+        os.path.join(OUTDIR, "extracted_ok")
+    output:
+        os.path.join(OUTDIR, "snakemake_genomes")
+    shell:
+        " ".join(sys.argv)
 
 rule pharokka_annotation:
     input:
-        "Phage_genomes/Refseq/GBid/{sample}/{sample}.fasta"   
+        os.path.join(OUTDIR_SAMPLE, "{sample}.fasta")
+    output:
+        os.path.join(OUTDIR_SAMPLE, "phanotate.faa")
     threads:
         32
     resources:
         slurm_partition = "short",
         runtime = 60,
-        cpus_per_task = 32,
-        tasks = 1,
         mem_mb = 8192,
         slurm_extra = "-J pharokka"
     params:
-        outdir="Pharokka_results/{sample}/"
-    output:
-        "Pharokka_results/{sample}/phanotate.faa"
+        outdir=OUTDIR_SAMPLE
     shell:
-        "module load tools/python/3.8; pharokka.py -i {input.fasta}"
-        " -o {params.outdir} -t {threads} -f"
+        "pharokka.py -i {input} -o {params.outdir} -t {threads} -f"
 
 rule defence_finder:
     input:
-        "Pharokka_results/{sample}/phanotate.faa"
+        os.path.join(OUTDIR_SAMPLE, "phanotate.faa")
+    output:
+        os.path.join(OUTDIR_SAMPLE, "defense_finder_systems.tsv")
+    threads:
+        32
     resources:
         slurm_partition = "short",
         runtime = 10,
-        nodes = 8,
-        cpus_per_task = 32,
-        tasks = 1,
         mem_mb = 2048,
-        slurm_extra = "-J definder"og:
+        slurm_extra = "-J definder"
     params:
-        outdir="DefFinder_results/{sample}/"
-    output:
-        "DefFinder_results/{sample}/defense_finder_systems.tsv"
+        outdir=OUTDIR_SAMPLE
     log:
-        log="DefFinder_results/{sample}/defense_finder_systems.log"
+        os.path.join(OUTDIR_SAMPLE, "defense_finder_systems.log")
     shell:
-        "module load tools/python/3.8; defense-finder run -o {params.outdir}"
-        " {input} > {log}"
+        "defense-finder run -o {params.outdir} {input} > {log}"

@@ -33,15 +33,22 @@ COMP<-"C:/Users/VEO_lab_0/Documents/Jena/"
 #read data
 IMG_data = read.table(paste0(COMP,"DefSystems/DefSysPro/Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv"), header = T, sep = "\t")
 #check data
-head(IMG_data)
+colnames(IMG_data)
 # quick length check
 hist(IMG_data$Length)
+IMG_data %>% 
+  filter(Length > 100000) %>% 
+  nrow()
 ```
 
 ```{r density plot}
 # Basic density
-IMG_data %>%  ggplot(aes(x=Length, color=Topology)) + 
-  geom_density() +
+IMG_data %>%  
+  filter(Estimated.completeness == 100 & 
+           Topology == "Provirus" ) %>%
+  ggplot(aes(x=Length, color=Topology)) + 
+  geom_density(size=1.1) +
+  xlim(0, 200000) +
   theme_classic()
 ```
 
