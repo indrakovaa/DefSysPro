@@ -6,31 +6,32 @@ from Bio import SeqIO
 from pathlib import Path
 
 """
-  header fasta
+  Python script to extract single fasta files based on information in
+  extarnal tsv table. Fasta header matches UVIG.
+  Topology of the viral sequence (Linear, Provirus, GVMAG...)
+  Estimated completeness of the sequence (%)
+  Length of the sequence (nt)
+  test run ./extract_topology.py "Direct terminal repeat" 1 1 ../Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv ../Phage_genomes/IMG_VR/IMGVR_all_nucleotides-high_confidence.fna output
+  """
 
-  >IMGVR_UViG_2504643025_000001|2504643025|2504645545|381-5974
-
-  name in the tsv file - informace v prvnim sloupci
-  
-  IMGVR_UViG_2504643025_000001
-
-  python script to extract fasta entries matching criteria
-"""
-
-if (len(sys.argv) != 5):
-  print(f"Usage: {sys.argv[0]} <filtered Topology> <tsv filename> <fasta filename> <output directory>")
+if (len(sys.argv) != 7):
+  print(f"Usage: {sys.argv[0]} <filtered Topology> <minimal Length> <minimal completeness [%] <tsv filename> <fasta filename> <output directory>")
   exit(1)
 
-#debug = False
-debug = True
+debug = False
+#debug = True
 
 filter_topology = sys.argv[1]
-tsv = sys.argv[2]
-fasta = sys.argv[3]
-output_dir = sys.argv[4]
+min_length = int(sys.argv[2])
+min_completeness = float(sys.argv[3])
+tsv = sys.argv[4]
+fasta = sys.argv[5]
+output_dir = sys.argv[6]
 
 if debug:
   print(f"topology filter: {filter_topology}", file=sys.stderr)
+  print(f"min length filter: {min_length}", file=sys.stderr)
+  print(f"min completeness filter: {min_completeness}", file=sys.stderr)
   print(f"tsv: {tsv}", file=sys.stderr)
   print(f"fasta: {fasta}", file=sys.stderr)
   print(f"output directory: {output_dir}\n", file=sys.stderr)
@@ -42,7 +43,7 @@ with open(tsv) as csvfile:
     lines = csv.reader(csvfile, delimiter='\t')
     # Find UVIG and Topology index in tsv file header line
     header = next(lines)
-    col_id = col_topology = col_completeness = -1
+    col_id = col_topology = col_completeness = col_length = -1
     for i, field in enumerate(header):
       if field == "UVIG":
         if debug:
@@ -56,19 +57,34 @@ with open(tsv) as csvfile:
         if debug:
           print(f"Completeness index: {i}", file=sys.stderr)
         col_completeness = i
+      elif field == "Length":
+        if debug:
+          print(f"Length index: {i}", file=sys.stderr)
+        col_length = i
       else:
         continue
-      if col_id >= 0 and col_topology >= 0 and col_completeness >= 0:
+      if col_id >= 0 and col_topology >= 0 and \
+        col_completeness >= 0 and col_length >= 0:
+        
         break
     # Process every tsv line
+    # 1. filter by topology
+    # 2. filter by minimal length
+    # 3. filter by completeness, drop NA values
     for seq in lines:
       if seq[col_topology] == filter_topology and \
-        (filter_topology in [ "GVMAG" ] or seq[col_completeness] == 100):
-        
+        int(seq[col_length]) >= min_length and \
+        not seq[col_completeness] == "NA" and \
+        float(seq[col_completeness]) >= min_completeness:
+
         seq_ids[seq[col_id]] = True
+        if debug:
+          print(seq[col_id])
 
 if debug:
-  print("\nStart farsta lookup ...", file=sys.stderr)
+  print(f"\nNr of found IDs: {len(seq_ids)}", file=sys.stderr)
+  print("\nStart fasta lookup ...", file=sys.stderr)
+
 # Go through fasta file and print seqs we're interested in
 i = 0
 for seq in SeqIO.parse(fasta, "fasta"):

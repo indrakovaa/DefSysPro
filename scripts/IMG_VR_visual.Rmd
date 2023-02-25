@@ -36,20 +36,82 @@ IMG_data = read.table(paste0(COMP,"DefSystems/DefSysPro/Phage_genomes/IMG_VR/IMG
 colnames(IMG_data)
 # quick length check
 hist(IMG_data$Length)
+
+levels(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1]))
+#works neatly, 
+table(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1]))
+
+
+#dplyr count needs name of the column
+colnames(data.frame(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1])))
+count(data.frame(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1])), as.factor.str_split_fixed.IMG_data.Host.taxonomy.prediction..)
+
+domain_df <- data.frame(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1]))
+colnames(domain_df) <- c("domain")
+
+count_domain_df<- count(domain_df, domain)
+
+#change factor leves
+levels(count_domain_df$domain) <- c("Unknown", "Archea", "Bacteria")
+
+#add position of the labels
+count_domain_df <- count_domain_df %>% 
+  arrange(desc(domain)) %>%
+  mutate(prop = n / sum(count_domain_df$n) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+count_domain_df %>% 
+  ggplot(aes(fill=domain, y=n, x="")) +
+  geom_bar(stat = "identity", width = 1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void()#+
+## position of the text is not functioning
+  theme(legend.position="none") +
+  geom_text(aes(y = ypos, label = domain), color = "white", size=5) +
+  scale_fill_brewer(palette="Set1")
+
+sum(is.na(IMG_data$Estimated.completeness))
+
+#Filter number of viruses based on Topology, completeness and length
+IMG_data %>%   
+  filter(str_detect(Host.taxonomy.prediction, "d__Bacteria") &
+         Topology == "Linear" &
+         !is.na(Estimated.completeness) &
+         Estimated.completeness > 90 &
+           Length > 1
+         ) %>% 
+    nrow()
+
+#select only viruses with bacterial host
 IMG_data %>% 
-  filter(Length > 100000) %>% 
-  nrow()
+  filter(str_detect(Host.taxonomy.prediction, "d__Bacteria") &
+         Topology == "Provirus" &
+         !is.na(Estimated.completeness) &
+         Estimated.completeness == 100 &
+         Length > 1) %>% 
+    nrow()
 ```
 
 ```{r density plot}
 # Basic density
 IMG_data %>%  
-  filter(Estimated.completeness == 100 & 
-           Topology == "Provirus" ) %>%
+  filter(Estimated.completeness > 90 &
+           Length > 25000 &
+           Topology == "Linear" ) %>%
   ggplot(aes(x=Length, color=Topology)) + 
   geom_density(size=1.1) +
   xlim(0, 200000) +
   theme_classic()
 ```
 
+```{r density plot Bacteria}
+# Basic density
+IMG_data_bacteria %>%  
+  filter(Estimated.completeness > 90 &
+           Length > 25000 &
+           Topology == "Linear" ) %>%
+  ggplot(aes(x=Length, color=Topology)) + 
+  geom_density(size=1.1) +
+  xlim(0, 200000) +
+  theme_classic()
 ```
