@@ -1,0 +1,100 @@
+---
+title: "Plotting genomes"
+author: "Adéla Finstrlová"
+date: "2023-02-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#rm(list=ls(all=TRUE)) ##removes all variables that were stored in rstudio from older projects
+install.packages("gggenes")
+library("tidyverse")
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("ggtree", ask = F)
+
+# install.packages("devtools")
+# install with no other packages loaded, otherwise restart R with .rs.restartR()
+devtools::install_github("thackl/thacklr")
+devtools::install_github("thackl/gggenomes")
+```
+
+```{r define genome}
+# a minimal seq track
+s0 <- tibble(
+  seq_id = c("a", "b"),
+  length = c(600, 550)
+)
+
+# a minimal gene track
+g0 <- tibble(
+  seq_id = c("a", "a", "b"),
+  start = c(50, 350, 80),
+  end = c(250, 500, 450)
+)
+
+# a simple link track
+l0 <- tibble(
+  seq_id = c("a", "a"),
+  start = c(50, 400),
+  end = c(250, 480),
+  seq_id2 = c("b", "b"),
+  start2 = c(80, 350),
+  end2 = c(300, 430)
+)
+```
+
+Plot comparative genomics data with gggenomes
+
+```{r gggenome plot, echo=FALSE}
+library("gggenomes")
+#basic comparison with example data
+p <- gggenomes(genes=g0, seqs=s0, links=l0)
+p + 
+  geom_seq() +         # draw contig/chromosome lines
+  geom_seq_label() +   # label each sequence 
+  geom_gene() +        # draw genes as arrow
+  geom_link()          # draw some connections between syntenic regions
+
+# to inspect the example data shipped with gggenomes
+data(package="gggenomes")
+
+#plot genomes from sample data
+gggenomes(emale_genes, emale_seqs, emale_tirs, emale_ava) %>%
+  add_feats(ngaros=emale_ngaros, gc=emale_gc) %>%
+  add_sublinks(emale_prot_ava) %>%
+  flip_by_links() +
+  geom_feat(position="identity", size=6) +
+  geom_seq() +
+  geom_link(data=links(2)) +
+  geom_bin_label() +
+  geom_gene(aes(fill=name)) +
+  geom_gene_tag(aes(label=name), nudge_y=0.1, check_overlap = TRUE) +
+  geom_feat(data=feats(ngaros), alpha=.3, size=10, position="identity") +
+  geom_feat_note(aes(label="Ngaro-transposon"), feats(ngaros),
+      nudge_y=.1, vjust=0) +
+  geom_ribbon(aes(x=(x+xend)/2, ymax=y+.24, ymin=y+.38-(.4*score),
+      group=seq_id, linetype="GC-content"), feats(gc),
+      fill="lavenderblush4", position=position_nudge(y=-.1)) +
+  scale_fill_brewer("Genes", palette="Dark2", na.value="cornsilk3")
+
+# for saving
+#ggsave("man/figures/emales.png", width=8, height=4)
+
+```
+
+Plot beautiful genomes with gggenes
+
+```{r gggenes plot}
+library("gggenes")
+# https://wilkox.org/gggenes/
+# By default, genes arrows are drawn pointing in the direction implied by
+# xmin and xmax. You can override this with the optional forward aesthetic.
+ggplot(example_genes, aes(xmin = start, xmax = end, y = molecule, fill = gene,
+                          forward = orientation)) +
+  geom_gene_arrow() +
+  facet_wrap(~ molecule, scales = "free", ncol = 1) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_genes()
+```

@@ -8,33 +8,38 @@ from pathlib import Path
 """
   Python script to extract single fasta files based on information in
   extarnal tsv table. Fasta header matches UVIG.
-  Topology of the viral sequence (Linear, Provirus, GVMAG...)
-  Estimated completeness of the sequence (%)
-  Length of the sequence (nt)
-  test run ./extract_topology.py "Direct terminal repeat" 1 1 ../Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv ../Phage_genomes/IMG_VR/IMGVR_all_nucleotides-high_confidence.fna output
+  1. Set Topology of the viral sequence (Linear, Provirus, GVMAG...)
+  2. Set minimal Length of the sequence (nt)
+  3. Set minimal Estimated completeness of the sequence (%)
+  4. Host taxonomy prediction - set if you want to filter bacterial hosts sequences or not (bacteria or all) ("d__Bacteria", "d__Archaea", "")
+  Functional test run:
+    ./extract_topology.py "Direct terminal repeat" 1 1 bacteria ../Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv ../Phage_genomes/IMG_VR/IMGVR_all_nucleotides-high_confidence.fna output
   """
 
-if (len(sys.argv) != 7):
-  print(f"Usage: {sys.argv[0]} <filtered Topology> <minimal Length> <minimal completeness [%] <tsv filename> <fasta filename> <output directory>")
+if (len(sys.argv) != 8):
+  print(f"Usage: {sys.argv[0]} <filtered Topology> <minimal Length> <minimal completeness [%]> <host bacteria ir all> <tsv filename> <fasta filename> <output directory>")
   exit(1)
 
-debug = False
-#debug = True
+#debug = False
+debug = True
 
 filter_topology = sys.argv[1]
 min_length = int(sys.argv[2])
 min_completeness = float(sys.argv[3])
-tsv = sys.argv[4]
-fasta = sys.argv[5]
-output_dir = sys.argv[6]
+host = sys.argv[4]
+tsv = sys.argv[5]
+fasta = sys.argv[6]
+output_dir = sys.argv[7]
 
 if debug:
   print(f"topology filter: {filter_topology}", file=sys.stderr)
   print(f"min length filter: {min_length}", file=sys.stderr)
   print(f"min completeness filter: {min_completeness}", file=sys.stderr)
+  print(f"host: {host}", file=sys.stderr)
   print(f"tsv: {tsv}", file=sys.stderr)
   print(f"fasta: {fasta}", file=sys.stderr)
   print(f"output directory: {output_dir}\n", file=sys.stderr)
+
 
 # Generate dictionary of seq_ids we're interested in
 seq_ids = dict()
@@ -43,7 +48,7 @@ with open(tsv) as csvfile:
     lines = csv.reader(csvfile, delimiter='\t')
     # Find UVIG and Topology index in tsv file header line
     header = next(lines)
-    col_id = col_topology = col_completeness = col_length = -1
+    col_id = col_topology = col_completeness = col_length = col_host = -1
     for i, field in enumerate(header):
       if field == "UVIG":
         if debug:
@@ -61,25 +66,37 @@ with open(tsv) as csvfile:
         if debug:
           print(f"Length index: {i}", file=sys.stderr)
         col_length = i
+      elif field == "Host taxonomy prediction":
+        if debug:
+          print(f"Host taxonomy prediction index: {i}", file=sys.stderr)
+        col_host = i
       else:
         continue
-      if col_id >= 0 and col_topology >= 0 and \
-        col_completeness >= 0 and col_length >= 0:
+      if col_id >= 0 and col_topology >= 0 and col_completeness >= 0 and\
+         col_host >= 0 and col_length >= 0:
         
         break
     # Process every tsv line
     # 1. filter by topology
     # 2. filter by minimal length
     # 3. filter by completeness, drop NA values
+    # 4. filter by host
     for seq in lines:
       if seq[col_topology] == filter_topology and \
         int(seq[col_length]) >= min_length and \
         not seq[col_completeness] == "NA" and \
         float(seq[col_completeness]) >= min_completeness:
+        if host == "bacteria":
+          if (seq[col_host]).startswith("d__Bacteria"):
+            seq_ids[seq[col_id]] = True
+        elif host == "all":
+          seq_ids[seq[col_id]] = True
+        else:
+          print(f"Host taxonomy prediction must be bacteria or all!")
+          exit()
 
-        seq_ids[seq[col_id]] = True
-        if debug:
-          print(seq[col_id])
+       # if debug:
+       #   print(seq[col_id])
 
 if debug:
   print(f"\nNr of found IDs: {len(seq_ids)}", file=sys.stderr)

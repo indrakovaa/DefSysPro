@@ -1,0 +1,49 @@
+---
+title: "Defense systems in phages"
+author: "Adéla Finstrlová"
+date: "2023-02-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls(all=TRUE)) ##removes all variables that were stored in rstudio from older projects
+##install.packages("car")
+library("tidyverse")
+# install bioconductor, run with ctrl + enter, when asked "update all/some/none" pres n
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+#BiocManager::install("apeglm", ask = FALSE) # update old packages without being prompted
+```
+
+
+```{r variables, include=F}
+#Work LMDM-5
+#COMP<-"d:/Prace/"
+#T420 Lenovo
+#COMP<-"d:/Ade/Documents/Uni/Prace/"
+#Fujitsu
+COMP<-"C:/Users/VEO_lab_0/Documents/Jena/"
+```
+
+
+# Reseq Database
+## Results from Defense finder search
+```{r data}
+#read data
+refseq_results = read.table(paste0(COMP,"DefSystems/DefSysPro/Phage_genomes/Refseq/def_systems_refseq.tsv"), 
+                           header = T, sep = "\t")
+phage_table =  read.csv(paste0(COMP,"DefSystems/DefSysPro/Phage_genomes/Refseq/def_systems_refseq_phages.csv"), 
+                           header = T)
+  
+#add proper column names
+colnames(refseq_results)
+#remove a space char in phage_table$genbank_id
+phage_table$genbank_id <- gsub(" ", "", phage_table$genbank_id)
+# join the two tables
+refseq_results <- right_join(phage_table, refseq_results, by = join_by("genbank_id"=="genbank_id"))
+#export to csv
+write.csv(refseq_results, paste0(COMP, "DefSystems/DefSysPro/Phage_genomes/Refseq/def_systems_refseq_all.csv"),
+          row.names = F)
+```
+

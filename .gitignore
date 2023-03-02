@@ -5,3 +5,5 @@ output/
 scripts/Phages_with_DF.csv
 scripts/output/
 scripts/output_direct
+scripts/.Rhistory
+scripts/.RData

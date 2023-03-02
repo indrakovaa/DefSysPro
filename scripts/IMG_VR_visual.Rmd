@@ -14,8 +14,6 @@ library("tidyverse")
 #if (!requireNamespace("BiocManager", quietly = TRUE))
 #  install.packages("BiocManager")
 #BiocManager::install("apeglm", ask = FALSE) # update old packages without being prompted
-# install DESeq2
-#BiocManager::install("DESeq2")
 ```
 
 ```{r variables, include=F}
