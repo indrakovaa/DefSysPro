@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 #rm(list=ls(all=TRUE)) ##removes all variables that were stored in rstudio from older projects
-install.packages("gggenes")
+#install.packages("gggenes")
 library("tidyverse")
 #if (!requireNamespace("BiocManager", quietly = TRUE))
 #    install.packages("BiocManager")
@@ -16,9 +16,19 @@ library("tidyverse")
 
 # install.packages("devtools")
 # install with no other packages loaded, otherwise restart R with .rs.restartR()
-devtools::install_github("thackl/thacklr")
-devtools::install_github("thackl/gggenomes")
+#devtools::install_github("thackl/thacklr")
+#devtools::install_github("thackl/gggenomes")
 ```
+
+```{r variables, include=F}
+#Work LMDM-5
+#COMP<-"d:/Prace/"
+#T420 Lenovo
+#COMP<-"d:/Ade/Documents/Uni/Prace/"
+#Fujitsu
+COMP<-"C:/Users/VEO_lab_0/Documents/Jena/"
+```
+
 
 ```{r define genome}
 # a minimal seq track
@@ -98,3 +108,26 @@ ggplot(example_genes, aes(xmin = start, xmax = end, y = molecule, fill = gene,
   scale_fill_brewer(palette = "Set3") +
   theme_genes()
 ```
+Plot genomes of the crAss phages
+```{r crAss phages}
+# read data
+prodigal <- read.delim(paste0(COMP,"DefSystems/DefSysPro/pharokka_test/prodigal/prodigal.gff.forR.txt"))
+phanotate <-read.delim(paste0(COMP,"DefSystems/DefSysPro/pharokka_test/phanotate/phanotate.gff.forR.txt"))
+# Nr of CDS prediction
+pred_list <- list(prodigal, phanotate)
+names(pred_list) <- c("prodigal", "phanotate")
+lapply(pred_list, nrow)
+#modify the dataframe for gggenes package
+pred <- rbind(prodigal, phanotate)
+pred %>%
+      mutate(orientation = ifelse(straind == "+", 1,-1),  .after = straind) -> pred
+#plot the genome maps
+ggplot(pred, aes(xmin = start, xmax = end, y=source, forward=orientation, fill=(end-start))) +
+  geom_gene_arrow() +
+  facet_wrap(~ source, scales = "free", ncol = 1) +
+  scale_fill_distiller(palette = "Spectral", direction = -1) +
+  theme_genes()
+
+
+```
+

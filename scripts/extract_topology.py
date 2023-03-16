@@ -11,13 +11,18 @@ from pathlib import Path
   1. Set Topology of the viral sequence (Linear, Provirus, GVMAG...)
   2. Set minimal Length of the sequence (nt)
   3. Set minimal Estimated completeness of the sequence (%)
-  4. Host taxonomy prediction - set if you want to filter bacterial hosts sequences or not (bacteria or all) ("d__Bacteria", "d__Archaea", "")
+  4. Host taxonomy prediction - set if you want to filter bacterial hosts 
+     sequences or not (bacteria or all) (three domains: "d__Bacteria", "d__Archaea", "")
   Functional test run:
-    ./extract_topology.py "Direct terminal repeat" 1 1 bacteria ../Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv ../Phage_genomes/IMG_VR/IMGVR_all_nucleotides-high_confidence.fna output
+    ./extract_topology.py "Direct terminal repeat" 1 1 bacteria \
+    ../Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv \
+    ../Phage_genomes/IMG_VR/IMGVR_all_nucleotides-high_confidence.fna output
   """
 
 if (len(sys.argv) != 8):
-  print(f"Usage: {sys.argv[0]} <filtered Topology> <minimal Length> <minimal completeness [%]> <host bacteria ir all> <tsv filename> <fasta filename> <output directory>")
+  print(f"Usage: {sys.argv[0]} <filtered Topology> <minimal Length> \
+        <minimal completeness [%]> <host bacteria ir all> <tsv filename> \
+        <fasta filename> <output directory>")
   exit(1)
 
 #debug = False
