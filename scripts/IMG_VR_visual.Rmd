@@ -25,91 +25,358 @@ library("tidyverse")
 COMP<-"C:/Users/VEO_lab_0/Documents/Jena/"
 ```
 
-## 0. Data
+# Data
 
-```{r read data}
-#read data
+Table with metadata downloaded from IMG/VR database
+data downloaded 25. 1. 2023, "IMG_VR_2022-09-20_7.1 - IMG/VR v4.1  (bugfix UViG table & protein fasta) - high-confidence genomes only"
+ "These sequence data were produced by the US Department of Energy Joint Genome Institute http://www.jgi.doe.gov/ in collaboration with the user community."
+write to PI of JGI prior to publication
+nucleotide sequences: 5 621 398, protein sequences: 112 567 455
+lines in tsv information file: 5 576 198 incl header (dif is 45 201, all GVMAG)
+take app. 100 000 for analysis, only nucleotide sequences
+
+
+```{r read data, include=F}
+#read data from IMG/VR database
 IMG_data = read.table(paste0(COMP,"DefSystems/DefSysPro/Phage_genomes/IMG_VR/IMGVR_all_Sequence_information-high_confidence.tsv"), header = T, sep = "\t")
-#check data
+```
+
+## Inspection of the whole IMG/VR data set and selection criteria
+
+IMG/VR v4 UViGs were clustered at the standard 95% ANI 85% AF thresholds into 8 606 551 vOTUs (5 846 590 of which are singletons).
+
+Interesting information in various columns to narrow down the analysis for run in Draco cluster:
+Length of the sequence - genome of prokaryotic virus should be from 3.3 kb up to 735 kb
+Completeness of the sequences - CheckV
+Predicted  host of the virus - Bacteria vs Archea vs unpredicted (unknown)
+Topology of the sequence - 
+
+``` {r data check}
+# check data
 colnames(IMG_data)
 # quick length check
 hist(IMG_data$Length)
+```
 
-levels(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1]))
-#works neatly, 
+### Predicted host
+
+``` {r imgrv host prediction, include =F}
+# quick check of how many samples have predicted host
 table(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1]))
+# the same using dplyr count function. It needs name of the column
+#colnames(data.frame(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1])))
+#count(data.frame(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1])), as.factor.str_split_fixed.IMG_data.Host.taxonomy.prediction..)
+```
 
-
-#dplyr count needs name of the column
-colnames(data.frame(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1])))
-count(data.frame(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1])), as.factor.str_split_fixed.IMG_data.Host.taxonomy.prediction..)
-
+```{r imgvrhost prediction 2}
+# new nice table with the counts
 domain_df <- data.frame(as.factor(str_split_fixed(IMG_data$Host.taxonomy.prediction,";", 2)[,1]))
 colnames(domain_df) <- c("domain")
-
+## counts
 count_domain_df<- count(domain_df, domain)
-
-#change factor leves
+## change factor levels
 levels(count_domain_df$domain) <- c("Unknown", "Archea", "Bacteria")
-
-#add position of the labels
+count_domain_df
+# the host was predicted with one of these methods
+levels(as.factor(IMG_data$Host.prediction.method))
+## for example
+#IMG_data[IMG_data$Host.prediction.method == "CRISPR spacer match",][1:10,]
+#change order of the not used in the end
 count_domain_df <- count_domain_df %>% 
-  arrange(desc(domain)) %>%
-  mutate(prop = n / sum(count_domain_df$n) *100) %>%
-  mutate(ypos = cumsum(prop)- 0.5*prop )
-
+  arrange(desc(domain))
+#plot
 count_domain_df %>% 
   ggplot(aes(fill=domain, y=n, x="")) +
   geom_bar(stat = "identity", width = 1, color="white") +
-  coord_polar("y", start=0) +
-  theme_void()#+
-## position of the text is not functioning
-  theme(legend.position="none") +
-  geom_text(aes(y = ypos, label = domain), color = "white", size=5) +
-  scale_fill_brewer(palette="Set1")
+  scale_fill_brewer(palette="Set1") +
+  coord_polar(theta = "y") +
+  theme_void() +
+  theme(axis.ticks=element_blank(),
+        axis.text.y=element_blank(),
+        axis.text.x=element_text(colour='black'),
+        axis.title=element_blank()) +
+  scale_y_continuous(breaks=cumsum(count_domain_df$n) - count_domain_df$n / 2, labels= count_domain_df$domain)
+```
 
-sum(is.na(IMG_data$Estimated.completeness))
+*Estimated completeness* of the viral sequence. I want to filter for more complete (==100) or almost complete (>90) sequences, I will loose the NA data, which is `sum(is.na(IMG_data$Estimated.completeness))` in total.
 
-#Filter number of viruses based on Topology, completeness and length
+*Topology*
+There are 6 groups with different sequence topology:
+
+```{r topology, echo=F}
+table(IMG_data$Topology)
+```
+
+I will not use the GVMAG topology, because those are only eukaryotic viruses.
+I will start with proviruses, because I expect the most antiphage defence systems there, 
+then I will search in the Direct and Inverted terminal repeat entries, finally I will 
+select around 100,000 sequences from the linear topology, mostly longer sequences, where
+I expect more antiphage defence systems than in the shorter sequences.
+
+ 1. Provirus
+```{r provirus length}
+## Filter number of viruses based on Topology, completeness and length
+IMG_data %>%   
+  filter(Topology == "Provirus" &
+         !is.na(Estimated.completeness) &
+         Estimated.completeness == 100 &
+           Length > 1
+         ) %>% 
+    nrow()
+#plot
+IMG_data %>%   
+  filter(Topology == "Provirus" &
+         !is.na(Estimated.completeness) &
+         Estimated.completeness == 100 &
+           Length > 1
+         ) %>% 
+ggplot(aes(x=Length)) + 
+  geom_density(color="magenta", size=1.1) +
+  xlim(0, 200000) +
+  theme_classic()
+```
+
+2. Direct terminal repeats
+
+```{r direct length}
+IMG_data %>%   
+  filter(str_detect(Host.taxonomy.prediction, "d__Bacteria") &
+         Topology == "Direct terminal repeat" &
+         !is.na(Estimated.completeness) &
+         Estimated.completeness > 1 &
+           Length > 1
+         ) %>% 
+    nrow()
+#plot
+IMG_data %>%   
+  filter(str_detect(Host.taxonomy.prediction, "d__Bacteria") &
+         Topology == "Direct terminal repeat" &
+         !is.na(Estimated.completeness) &
+         Estimated.completeness > 1 &
+           Length > 1
+         ) %>% 
+ggplot(aes(x=Length)) + 
+  geom_density(color="green", size=1.1) +
+  xlim(0, 200000) +
+  theme_classic()
+```
+
+3. Inverted terminal repeats
+
+```{r inverted length}
+IMG_data %>%   
+  filter(Topology == "Inverted terminal repeat" &
+         !is.na(Estimated.completeness) &
+         Estimated.completeness > 1 &
+           Length > 1
+         ) %>% 
+    nrow()
+## plot
+IMG_data %>%   
+  filter(Topology == "Inverted terminal repeat" &
+         !is.na(Estimated.completeness) &
+         Estimated.completeness > 1 &
+           Length > 1
+         ) %>% 
+ggplot(aes(x=Length)) + 
+  geom_density(color="orange", size=1.1) +
+  xlim(0, 200000) +
+  theme_classic()
+```
+
+4. Linear
+
+```{r linear length}
 IMG_data %>%   
   filter(str_detect(Host.taxonomy.prediction, "d__Bacteria") &
          Topology == "Linear" &
          !is.na(Estimated.completeness) &
          Estimated.completeness > 90 &
-           Length > 1
+           Length > 25000
          ) %>% 
     nrow()
 
-#select only viruses with bacterial host
-IMG_data %>% 
+## plot
+IMG_data %>%   
   filter(str_detect(Host.taxonomy.prediction, "d__Bacteria") &
-         Topology == "Provirus" &
+         Topology == "Linear" &
          !is.na(Estimated.completeness) &
-         Estimated.completeness == 100 &
-         Length > 1) %>% 
+         Estimated.completeness > 90 &
+           Length > 25000
+         ) %>% 
+ggplot(aes(x=Length)) + 
+  geom_density(color="blue", size=1.1) +
+  xlim(0, 200000) +
+  theme_classic()
+```
+
+
+# Dig  through the Defence Finder results
+
+Table with results generated in the cluster and copied to local storage.
+Example in naming of the results:
+ - imgvr_genes_provirus.txt = List of defense system genes found by defense finder
+ - imgvr_systems_provirus.txt = Complete defense systems marked with the Defense finder
+ - imgvr_spacerlist_provirus.txt = list of files with spacers identified by Pharokka
+
+Example command to generate result table, I added header later
+It takes non-empty files, merge it into one and add a first column with the unique sequence identifier (=the name of the folder).
+for FILE in $(find . -name "*genes.tsv" -size +524c); do DIR=$(echo $FILE | sed -e 's|^.*\(IMGVR[^/]*\)/.*$|\1|'); sed -e "1d; s|^|$DIR\t|" "$FILE"; done
+
+## Provirus 
+
+As provirus were marked sequences extracted from integrated proviral sequences in genomes, metagenomes, or metatranscriptomes.
+I analyzed 52,268 complete Provirus entries (Estimated.completeness == 100) that were predicted as complete by CheckV , 
+of which has predicted bacterial host: 45,357 entries. All analyzed samples were marked as High-confidence viruses.
+
+```{r provirus results, include=F}
+# read results from defence finder search GENES
+provirus_genes = read.table(paste0(COMP,"DefSystems/DefSysPro/Phage_genomes/IMG_VR/imgvr_genes_provirus.txt"), header = T, sep = "\t", row.names = NULL)
+# merge genbank_id, hit_id, gene_name from by UVIG in IMG_data
+provirus_results <- provirus_genes %>% 
+  select("genbank_id", "hit_id", "gene_name") %>% 
+  left_join(IMG_data, by = join_by("genbank_id"=="UVIG"))
+
+# read results from defence finder search SYSTEMS
+provirus_systems = read.table(paste0(COMP,"DefSystems/DefSysPro/Phage_genomes/IMG_VR/imgvr_systems_provirus.txt"), header = T, sep = "\t", row.names = NULL)
+# merge genbank_id, hit_id, gene_name from by UVIG in IMG_data
+provirus_res_sys <- provirus_systems %>% 
+  left_join(IMG_data, by = join_by("genbank_id"=="UVIG"))
+
+# create table with the info about data taken for the search of defence systems
+provirus_dataset <- IMG_data %>%  
+  filter(!is.na(Estimated.completeness) &
+           Estimated.completeness >= 100 &
+           Length > 1 &
+           Topology == "Provirus" )
+```
+
+### Compare results with original data taken for the analysis
+
+Provirus dataset consist of sequences extracted of the larger pieces of DNA identified 
+automatically in genomes, metagenomes and metatranscriptomes.
+*As proviruses are found integrated in host genomes and because automatic boundary 
+determination is error-prone, CheckV was used to trim host regions from the edges 
+of geNomad-identified proviruses to reduce the amount of contamination by host 
+genes. Contamination by non-protein-coding genes was removed by trimming regions 
+that encoded ribosomal rRNAs, obtained from IMG/M annotation.
+Prediction and completeness of the prophage was checked by
+The seqeunces were predicted to be viral by geNomad.
+that are supposed to be high confidence viral sequences.*
+
+```{r provirus whole sequences, include=F}
+provirus_dataset %>%   
+  filter(Confidence == "High-confidence"
+         ) %>% 
     nrow()
 ```
 
-```{r density plot}
-# Basic density
-IMG_data %>%  
-  filter(Estimated.completeness > 90 &
-           Length > 25000 &
-           Topology == "Linear" ) %>%
-  ggplot(aes(x=Length, color=Topology)) + 
-  geom_density(size=1.1) +
-  xlim(0, 200000) +
+```{r hits locations, include=F}
+# How are the data of proviral sequences organized? 
+provirus_dataset %>%   
+  filter(Coordinates..whole.if.the.UViG.is.the.entire.contig. == "whole"
+         ) %>% 
+    nrow()
+# As we can see, no contig contain only proviral sequence.
+
+# Is there only proviral sequence in the multifasta file?
+## 1. split into two columns provirus_start provirus_stop the column
+provirus_results <- provirus_results %>% 
+  separate(col=Coordinates..whole.if.the.UViG.is.the.entire.contig., 
+           into=c("provirus_start", "provirus_stop"),
+           sep = "-", 
+           remove = T, 
+           convert = T) %>% 
+   mutate(provirus_length = provirus_stop - provirus_start, .after = provirus_stop)
+## 2. compare provirus_stop - provirus_start with Length (density plot) given in the 
+## metadata. Check also length of the actual DNA in respective fasta files.
+provirus_results %>%  
+  ggplot() + 
+  geom_density(aes(x=Length), color="steelblue", size=1.1) +
+  geom_density(aes(x=provirus_length), color="orange red", linetype = "dashed", size=1.1) +
+  theme_classic()
+# In conclusion, the entries in fasta file contained already only the viral sequences.
+```
+
+
+1. Total number of hits
+
+```{r number of hits}
+# number of sequences with positive SYSTEM hits 
+provirus_res_sys %>% 
+  group_by(genbank_id) %>% summarise() %>% nrow()
+# total number of found systems
+nrow(provirus_res_sys)
+# number of sequences with positive GENE hits 
+provirus_results %>% 
+  group_by(genbank_id) %>% summarise() %>% nrow()
+# total number of found genes
+nrow(provirus_results)
+```
+
+2. Number of systems/genes in sequences - distribution
+
+```{r count of systems in sequences}
+# systems
+provirus_res_sys %>% 
+  count(genbank_id) %>% 
+  ggplot(aes(x=n)) + 
+  geom_histogram(binwidth = 1, fill="steelblue", alpha = 0.6, color = "black") + 
+  stat_bin(binwidth= 1, geom="text", aes(label=after_stat(count)), vjust = -1) + 
+  ggtitle("Number of SYSTEMS in Proviruses positive hits") +
+  ylim(0, 100) +
+  theme_classic()
+# genes
+provirus_results %>% 
+  count(genbank_id) %>% 
+  ggplot(aes(x=n)) + 
+  geom_histogram(binwidth = 1, fill="orange red", alpha = 0.6, color = "black") + 
+  stat_bin(binwidth= 1, geom="text", aes(label=after_stat(count)), vjust = -1) + 
+  ggtitle("Number of GENES in Proviruses positive hits") +
+  scale_x_continuous(n.breaks=20) +
+  ylim(0, 3000) +
   theme_classic()
 ```
 
-```{r density plot Bacteria}
-# Basic density
-IMG_data_bacteria %>%  
-  filter(Estimated.completeness > 90 &
-           Length > 25000 &
-           Topology == "Linear" ) %>%
-  ggplot(aes(x=Length, color=Topology)) + 
-  geom_density(size=1.1) +
-  xlim(0, 200000) +
+
+3. Length of the sequences with positive hits compared to selected proviral dataset
+
+```{r lengths}
+# individual density plots
+provirus_res_sys %>% ggplot() + 
+  geom_density(aes(x=Length), color="steelblue", size=1.1) +
+  ggtitle("Defense finder systems - sequence length distribution") +
   theme_classic()
+
+#provirus_results %>% 
+#  group_by(genbank_id)
+#provirus_dataset
+# All in one density plot
+# ??Percentage of sequences of specific length??
 ```
+
+4. Frequency of each of the system/gene
+5. Heatmap presence of the system depending on host
+
+How to distinguish proviral sequences from islands, PICIs etc?
+
+```{r provirus taxonomy prediction }
+### host taxonomy prediction
+# new table with the counts of the taxonomy prediction
+domain_provirus <- data.frame(as.factor(str_split_fixed(provirus_results$Host.taxonomy.prediction,";", 2)[,1]))
+colnames(domain_provirus) <- c("domain")
+## counts
+count_domain_provirus<- count(domain_provirus, domain)
+## change factor levels
+levels(count_domain_provirus$domain) <- c("Unknown","Bacteria")
+count_domain_provirus
+```
+
+
+How to correlate with the environment?
+```{r environmental factors}
+#provirus_results
+ecosystem_provirus <- data.frame(str_split_fixed(provirus_results$Ecosystem.classification,";", 4))
+
+```
+
