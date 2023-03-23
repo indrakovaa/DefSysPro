@@ -5,6 +5,7 @@ date: "2023-02-08"
 output: html_document
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 #rm(list=ls(all=TRUE)) ##removes all variables that were stored in rstudio from older projects

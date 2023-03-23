@@ -10,7 +10,12 @@ OUTDIR_SAMPLE = os.path.join(OUTDIR, "{dataset}/{sample}")
 # Automatically detect what should all do
 # either generate list of genomes to process
 # or process the genomes
-DATASETS, SAMPLES, _ = glob_wildcards(OUTDIR_SAMPLE + "/{unused}.fasta")
+#DATASETS, SAMPLES, _ = glob_wildcards(os.path.join(OUTDIR, "{dataset,[^/]+}",
+#        "{sample,[^/]+}", "{unused,[^/]+}.fasta"))
+# run only successuful pharokka runs
+DATASETS, SAMPLES = glob_wildcards(os.path.join(OUTDIR, "{dataset,[^/]+}",
+        "{sample,[^/]+}", "pharokka", "phanotate.faa"))
+
 if not os.path.isfile(os.path.join(OUTDIR, "extracted_ok")):
     ALL_OUTPUT = os.path.join(OUTDIR, "snakemake_genomes")
 else:
@@ -32,10 +37,17 @@ rule extract_genomes:
         mfa="Phage_genomes/IMG_VR/IMGVR_all_nucleotides-high_confidence.fna"
     output:
         os.path.join(OUTDIR, "extracted_ok")
+    threads:
+        2
+    resources:
+        slurm_partition = "standard",
+        runtime = 120,
+        mem_mb = 8192,
+        slurm_extra = "-J extract"
     params:
-        filter="Direct terminal repeat",
+        filter="Provirus",
         length=1,
-        completeness=1,
+        completeness=100,
         outdir=OUTDIR
     shell:
         "scripts/extract_topology.py {params.filter} {params.length} {params.completeness} {input.tsv} {input.mfa} {params.outdir}"
@@ -45,6 +57,13 @@ rule snakemake_genomes:
         os.path.join(OUTDIR, "extracted_ok")
     output:
         os.path.join(OUTDIR, "snakemake_genomes")
+    threads:
+        2
+    resources:
+        slurm_partition = "long",
+        runtime = 20160,
+        mem_mb = 8192,
+        slurm_extra = "-J genomes"
     shell:
         " ".join(sys.argv)
 
@@ -56,14 +75,14 @@ rule pharokka_annotation:
     threads:
         32
     resources:
-        slurm_partition = "short",
-        runtime = 60,
+        slurm_partition = "standard",
+        runtime = 7,
         mem_mb = 8192,
-        slurm_extra = "-J pharokka"
+        slurm_extra = "-J pharokka  --exclusive=user"
     params:
         outdir=os.path.join(OUTDIR_SAMPLE, "pharokka")
     shell:
-        "pharokka.py -i {input} -o {params.outdir} -t {threads} -f"
+        "/bin/timeout -k 60s 30m pharokka.py -i {input} -o {params.outdir} -t {threads} -f"
 
 rule defence_finder:
     input:
@@ -73,13 +92,15 @@ rule defence_finder:
     threads:
         32
     resources:
-        slurm_partition = "short",
-        runtime = 10,
-        mem_mb = 2048,
-        slurm_extra = "-J definder"
+        slurm_partition = "standard",
+        runtime = 4,
+        mem_mb = 8192,
+        slurm_extra = "-J definder --exclusive=user"
+    group:
+        "pharokka"
     params:
         outdir=os.path.join(OUTDIR_SAMPLE, "defense_finder")
     log:
         os.path.join(OUTDIR_SAMPLE, "defense_finder_systems.log")
     shell:
-        "defense-finder run -o {params.outdir} {input} > {log}"
+        "/bin/timeout -k 60s 30m defense-finder run -o {params.outdir} {input} > {log}"
